@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-
+import numpy as np
 def Read_Decoding_Data(file_path):
     df1 = pd.read_csv(file_path, header=None)
     df1 = df1.rename(columns={
@@ -38,3 +38,29 @@ def process_all_files_in_folder(folder_path):
             dataframes_dict[filename] = processed_df
             print(f"Processed {filename}")
     return dataframes_dict
+
+
+def clean_data(station):
+    station.replace([-999, -99, 99, 'NA', 'RM','NaN'], np.nan, inplace=True)
+    station['Date'] = pd.to_datetime(station['Date'])
+    station['NES'] = pd.to_numeric(station['NES'], errors='coerce')
+    station['NWS'] = pd.to_numeric(station['NWS'], errors='coerce')
+    station['VLG'] = pd.to_numeric(station['VLG'], errors='coerce')
+    station['XPT'] = pd.to_numeric(station['XPT'], errors='coerce')
+    station['XMD'] = pd.to_numeric(station['XMD'], errors='coerce')
+    return station
+
+
+def avaliable_points(statoin):
+    summary = pd.DataFrame(index=['Count'])
+    NES_count = statoin['NES'].isna().sum() - len(statoin)
+    NWS_count = statoin['NWS'].isna().sum() - len(statoin)
+    VLG_count = statoin['VLG'].isna().sum() - len(statoin)
+    XMD_count = statoin['XMD'].isna().sum() - len(statoin)
+    XPT_count = statoin['XPT'].isna().sum() - len(statoin)
+    summary['NES'] = [abs(NES_count)]
+    summary['NWS'] = [abs(NWS_count)]
+    summary['VLG'] = [abs(VLG_count)]
+    summary['XMD'] = [abs(XMD_count)]
+    summary['XPT'] = [abs(XPT_count)]
+    return summary
