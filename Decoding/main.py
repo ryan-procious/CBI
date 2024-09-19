@@ -64,3 +64,13 @@ def avaliable_points(statoin):
     summary['XMD'] = [abs(XMD_count)]
     summary['XPT'] = [abs(XPT_count)]
     return summary
+
+def date_index_locater(start_date,end_date,comparison_df):
+    indices = []
+# Filter rows by date range
+    date_range_filter = (comparison_df['Dates'] >= start_date) & (comparison_df['Dates'] <= end_date)
+
+# Get the indices of the rows within the date range
+    indices = (comparison_df[date_range_filter].index.tolist())
+
+    return(indices)
