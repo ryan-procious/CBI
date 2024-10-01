@@ -100,7 +100,7 @@ def find_double_points(comparison_df, dataset):
 
 
 
-def broad_stats(df):
+def disagreements(df):
     df_date_filter = (df['Dates'] >= pd.to_datetime('2007-01-01 00:00')) & (df['Dates'] <= pd.to_datetime('2008-12-31 23:54'))
 
     NES_values = df[df_date_filter]['NES WL']
@@ -112,8 +112,22 @@ def broad_stats(df):
 
     stats_df['Difference'] = stats_df['NES'] - stats_df['NOAA']
 
-    non_zero_count = (stats_df['Difference'] != 0).sum()
+    non_zero_count = (stats_df['Difference'].notna() & (stats_df['Difference'] != 0)).sum()
 
     percent_of_disagrements = (non_zero_count/len(stats_df)) * 100
 
     return percent_of_disagrements
+
+def difference_df(df):
+    df_date_filter = (df['Dates'] >= pd.to_datetime('2007-01-01 00:00')) & (df['Dates'] <= pd.to_datetime('2008-12-31 23:54'))
+
+    NES_values = df[df_date_filter]['NES WL']
+    NOAA_values = df[df_date_filter]['NOAA WL']
+
+    stats_df = pd.DataFrame()
+    stats_df['NES'] = NES_values
+    stats_df['NOAA'] = NOAA_values
+
+    stats_df['Difference'] = stats_df['NES'] - stats_df['NOAA']
+
+    return stats_df
