@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
+import warnings
+warnings.filterwarnings("ignore")
 
 
 def read_wl_csv(file_path):
@@ -23,6 +25,8 @@ def read_wl_csv(file_path):
     wl_df['harmwl'] = pd.to_numeric(wl_df[keys[3]],errors= 'coerce')
     wl_df['pwl surge'] = wl_df['pwl'] - wl_df['harmwl']
     wl_df['bwl surge'] = wl_df['bwl'] - wl_df['harmwl']
+    del keys
+    return wl_df
 
 def locate_gaps(WL_data):
     lengthMissVal = []
@@ -44,6 +48,9 @@ def locate_gaps(WL_data):
     WL_data_gaps['date'] = pd.to_datetime(dates)
     WL_data_gaps['gapLength'] = lengthMissVal
     WL_data_gaps['gapTime(min)'] = WL_data_gaps['gapLength'] * 6
+
+    del lengthMissVal,dates,count
+
     return WL_data_gaps
 
 def eligible_gap_length(WL_gaps): #Function to sort the lengh of the gaps into three categories
@@ -53,6 +60,8 @@ def eligible_gap_length(WL_gaps): #Function to sort the lengh of the gaps into t
     #filters the data into individual dataframes
     linear_gaps = WL_gaps[WL_gaps_filter_6min]
     gaps_less_5_days = WL_gaps[WL_gaps_filter]
+
+    del WL_gaps_filter,WL_gaps_filter_6min
 
     return linear_gaps,gaps_less_5_days
 
@@ -68,6 +77,8 @@ def linear_fill(Wl_data,linear_gaps): #function to fill in gaps with length of 1
     for i in range(len(index_locations)):
         new_value = (Wl_data.loc[(index_locations[i])-1,'pwl surge']+ Wl_data.loc[index_locations[i]+1,'pwl surge']) / 2
         Wl_data.loc[index_locations[i],'pwl surge'] = new_value
+
+    del matching_dates, index_locations, new_value
     
     return Wl_data
 
@@ -88,6 +99,8 @@ def check_bwl(Wl_data,gaps):
         valid_gaps.append(is_valid)
     
     filtered_gaps = gaps[valid_gaps].reset_index(drop=True)
+
+    del matching_dates, index_locations, gap_length, valid_gaps, is_valid
 
     return filtered_gaps
          
@@ -159,6 +172,8 @@ def poly_gap_fill(Wl_data, gaps):
 
                 poly_df_list.append(poly_df)
 
+                del poly_df_copy, poly, pred_values
+
     matched_dates1 = []
     matched_dates2 = []
 
@@ -195,6 +210,10 @@ def poly_gap_fill(Wl_data, gaps):
     Wl_data_total = Wl_data_total.drop(columns='pwl surge_y',axis=0)
     Wl_data_total = Wl_data_total.drop(columns='bwl surge_y',axis=0)
 
+
+    del poly_df_list, matching_dates, index_locations, gap_length, gap_date_list, matched_dates1, matched_dates2, match_df_1, match_df_2
+
+
     return Wl_data_total
 
 
@@ -226,7 +245,5 @@ def cbi_gapfill(filepath):
 
     print('Gaps filled')
 
-    return filled_wl_dataset
+    return filled_wl_dataset , wl_dataset
     
-filled_P21_2016 = cbi_gapfill(r'C:\Users\mrpro\Documents\Code\CBI\Gap Filling\P21_2016_gaps.csv')
-

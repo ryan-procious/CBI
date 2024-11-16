@@ -1,0 +1,18 @@
+from GapFill_2014_CBI import *
+
+filepath = input('Insert Filepath to Water Level Dataset: ')
+
+try:
+    # Call the gap-filling function
+    filled_data,orig_data = cbi_gapfill(filepath)
+    print("Gap filling completed. Here's a preview of the data:")
+    print(filled_data.head())
+    print(orig_data.head())
+except FileNotFoundError:
+    print(f"Error: File not found at the given path: {filepath}")
+except Exception as e:
+    if str(e) == 'No objects to concatenate':
+        print('No gaps with back up water levels avaliable, try another method')
+    else:
+        print(f"An error occurred: {e}")
+
