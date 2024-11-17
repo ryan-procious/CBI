@@ -247,3 +247,35 @@ def cbi_gapfill(filepath):
 
     return filled_wl_dataset , wl_dataset
     
+def cbi_gapfill(filepath):
+
+    print('Reading dataset')
+    wl_dataset = read_wl_csv(filepath)
+    #wl_dataset_gaps = create_gaps(wl_dataset)
+    #print('Gaps Created')
+
+    Wl_gaps = locate_gaps(wl_dataset)
+
+    print('Total number of gaps: ', len(Wl_gaps))
+
+    linear_gaps,multi_gaps = eligible_gap_length(Wl_gaps)
+
+    print('Number of Linear Gaps filled:', len(linear_gaps))
+
+    dataset_LF = linear_fill(wl_dataset,linear_gaps)
+
+    print('Single gaps filled')
+
+    valid_multi_gaps = check_bwl(dataset_LF,multi_gaps)
+
+    print('Number of gaps with backup water level:', len(valid_multi_gaps))
+
+    filled_wl_dataset = poly_gap_fill(dataset_LF,valid_multi_gaps)
+
+    print('Gaps filled')
+
+    #complete_dataset = adjustment(filled_wl_dataset,index_location,gap_length)
+
+    return filled_wl_dataset , wl_dataset, Wl_gaps
+
+filled_data, orig_data,gap_list = cbi_gapfill(r'C:\Users\mrpro\Documents\Code\CBI\data 2\lighthouse\Pier 21\Pier21_2001-2012_pwl_harmwl_bwl.csv')
