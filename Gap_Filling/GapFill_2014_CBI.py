@@ -278,4 +278,4 @@ def cbi_gapfill(filepath):
 
     return filled_wl_dataset , wl_dataset, Wl_gaps
 
-filled_data, orig_data,gap_list = cbi_gapfill(r'C:\Users\mrpro\Documents\Code\CBI\data 2\lighthouse\Pier 21\Pier21_2001-2012_pwl_harmwl_bwl.csv')
+filled_data, orig_data,gap_list = cbi_gapfill(r'/Users/rprocious/Waterlevels_CBI/CBI-2/data 2/lighthouse/Pier 21/Pier21_2001-2012_pwl_harmwl_bwl.csv')
