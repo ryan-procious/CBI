@@ -16,8 +16,6 @@ def read_wl_csv(file_path):
 
     wl_df.drop(labels=range(len(wl_df)-6,len(wl_df)), axis=0, inplace=True)
 
-    #df_dates = 
-
     keys = wl_df.keys().to_list()
     
     wl_df['date'] = pd.to_datetime(wl_df[keys[0]])
@@ -41,7 +39,7 @@ def locate_gaps(WL_data):
     dates = []
     count = 0
     for i in range(len(WL_data)):
-        if pd.isna(WL_data['pwl surge'][i]):
+        if pd.isna(WL_data['pwl'][i]):
             if count == 0:  # Start of a new NaN gap
                 dates.append(WL_data['date'][i])  # Record the start date of the gap
             count += 1  # Increment the gap length
@@ -112,7 +110,7 @@ def check_bwl(Wl_data,gaps):
 
         for i in range(len(index_locations)):
 
-            is_valid = Wl_data['bwl surge'][index_locations[i]:index_locations[i]+gap_length[i]].isna().sum() == 0
+            is_valid = Wl_data['bwl'][index_locations[i]:index_locations[i]+gap_length[i]].isna().sum() == 0
             valid_gaps.append(is_valid)
         
         filtered_gaps = gaps[valid_gaps].reset_index(drop=True)
@@ -141,6 +139,8 @@ def poly_gap_fill(Wl_data, gaps):
 
         gap_date_list = list()
 
+        adjustment_list = []
+
         for i in range(len(matching_dates)):
 
             gap_date_df = pd.DataFrame()
@@ -155,9 +155,9 @@ def poly_gap_fill(Wl_data, gaps):
 
             if index_locations[i]- 2161  > 0 and index_locations[i]+2161+gap_length[i] < len(Wl_data):
 
-                pwl_30_days = Wl_data['pwl surge'][(index_locations[i]- 2160):index_locations[i]+2160+gap_length[i]].tolist()
+                pwl_30_days = Wl_data['pwl'][(index_locations[i]- 2160):index_locations[i]+2160+gap_length[i]].tolist()
 
-                bwl_30_days = Wl_data['bwl surge'][(index_locations[i]- 2160):index_locations[i]+2160+gap_length[i]].tolist()
+                bwl_30_days = Wl_data['bwl'][(index_locations[i]- 2160):index_locations[i]+2160+gap_length[i]].tolist()
 
                 dates = Wl_data['date'][(index_locations[i]- 2160):index_locations[i]+2160+gap_length[i]].tolist()
 
@@ -172,21 +172,21 @@ def poly_gap_fill(Wl_data, gaps):
 
                 slope, intercept, *_ = stats.linregress(linear_df['bwl 30'],linear_df['pwl 30'])
 
-                poly_df = pd.DataFrame({'bwl surge': bwl_30_days, 'pwl surge': pwl_30_days,'date' : pd.to_datetime(dates)})
+                poly_df = pd.DataFrame({'bwl': bwl_30_days, 'pwl': pwl_30_days,'date' : pd.to_datetime(dates)})
 
-                poly_df['mwl surge linear'] = intercept + slope*poly_df['bwl surge']
+                poly_df['mwl linear'] = intercept + slope*poly_df['bwl']
 
 
 
-                outliers = poly_df[abs(poly_df['mwl surge linear'] - poly_df['pwl surge']) > 0.1]
+                #outliers = poly_df[abs(poly_df['mwl linear'] - poly_df['pwl']) > 0.1]
 
-                print(f"Number of outliers detected: {len(outliers)}")
+                #print(f"Number of outliers detected: {len(outliers)}")
 
-                mask = abs(poly_df['mwl surge linear'] - poly_df['pwl surge']) > 0.1
+                mask = abs(poly_df['mwl linear'] - poly_df['pwl']) > 0.1
                 
-                poly_df.loc[mask, 'pwl surge'] = np.nan
-                poly_df.loc[mask, 'mwl surge linear'] = np.nan
-                poly_df.loc[mask, 'bwl surge'] = np.nan
+                poly_df.loc[mask, 'pwl'] = np.nan
+                poly_df.loc[mask, 'mwl linear'] = np.nan
+                poly_df.loc[mask, 'bwl'] = np.nan
                 
                 '''plt.scatter(poly_df['pwl surge'], poly_df['bwl surge'])
 
@@ -201,21 +201,32 @@ def poly_gap_fill(Wl_data, gaps):
             
 
                 
-                if poly_df['bwl surge'].isna().sum() + poly_df['pwl surge'].isna().sum() < len(Wl_data)*0.1:
+                if poly_df['bwl'].isna().sum() + poly_df['pwl'].isna().sum() < len(Wl_data)*0.1:
 
                     poly_df_copy = poly_df.copy()
 
                     poly_df_copy.dropna(inplace=True)
 
-                    poly =np.polynomial.polynomial.Polynomial.fit(poly_df_copy['pwl surge'],poly_df_copy['bwl surge'],4)
+                    poly =np.polynomial.polynomial.Polynomial.fit(poly_df_copy['pwl'],poly_df_copy['bwl'],4)
 
-                    coeffs = np.polyfit(poly_df_copy['bwl surge'],poly_df_copy['pwl surge'],4)
+                    coeffs = np.polyfit(poly_df_copy['bwl'],poly_df_copy['pwl'],4)
 
                     poly1 = np.poly1d(coeffs)
 
-                    pred_values = poly1(poly_df['bwl surge'])
+                    pred_values = poly1(poly_df['bwl'])
 
-                    poly_df['mwl surge'] = pred_values
+                    poly_df['mwl'] = pred_values
+                    
+                    average_before_gap = np.nanmean(Wl_data['pwl'][(index_locations[i]-6):index_locations[i]].tolist())
+                    average_after_gap = np.nanmean(Wl_data['pwl'][(index_locations[i]+1+gap_length[i]):index_locations[i]+6+gap_length[i]].tolist())
+
+                    n_length = gap_length[i]
+
+                    for k in range(n_length):
+
+                        adjustment_value = (average_after_gap + (k / n_length)) * (average_before_gap - average_after_gap)
+
+                        adjustment_list.append(adjustment_value)
 
                     '''plt.scatter([poly_df['pwl surge']], poly_df['bwl surge'])
 
@@ -240,7 +251,7 @@ def poly_gap_fill(Wl_data, gaps):
                 print('Can not fill gap out of bounds')
         
 
-        return poly_df_list, index_locations, gap_length, gap_date_list
+        return poly_df_list, index_locations, gap_length, gap_date_list, adjustment_list
 
 
     else:
@@ -282,48 +293,31 @@ def fill_gaps(poly_list, gap_dates_list, wl_df):
     Wl_data_total = match_df_2.merge(wl_df, on='date', how='outer')
 
     # Clean up columns
-    Wl_data_total = Wl_data_total.drop(columns=['bwl surge_x', 'pwl surge_x', '#date+time'], errors='ignore')
-    Wl_data_total['pwl surge'] = Wl_data_total.get('pwl surge_y', None)
-    Wl_data_total['bwl surge'] = Wl_data_total.get('bwl surge_y', None)
-    Wl_data_total = Wl_data_total.drop(columns=['pwl surge_y', 'bwl surge_y'], errors='ignore')
+    Wl_data_total = Wl_data_total.drop(columns=['bwl_x', 'pwl_x', '#date+time'], errors='ignore')
+    Wl_data_total['pwl'] = Wl_data_total.get('pwl_y', None)
+    Wl_data_total['bwl'] = Wl_data_total.get('bwl_y', None)
+    Wl_data_total = Wl_data_total.drop(columns=['pwl_y', 'bwl_y'], errors='ignore')
 
     # Clean up memory by deleting unnecessary variables
     del poly_list, gap_dates_list, matched_dates1, matched_dates2, match_df_1, match_df_2
 
     return Wl_data_total  
 
-def adjustment(filled_df,index_locations,gap_length):
 
-    adj_list = []
+def adjustment(filled_df, adj_list):
 
-    for i in range(len(index_locations)):
-
-        average_before_gap = np.mean(filled_df['pwl surge'][(index_locations[i]-6):index_locations[i]].tolist())
-        average_after_gap = np.mean(filled_df['pwl surge'][(index_locations[i]+1+gap_length[i]):index_locations[i]+6+gap_length[i]].tolist())
-
-        n_length = gap_length[i]
-
+    filled_df['mwl adjusted'] = filled_df['mwl']
         
-
-        for k in range(n_length):
-
-            adjustment = (average_after_gap+(k/n_length)) * (average_before_gap - average_after_gap)
-
-            adj_list.append(adjustment)
-
-    filled_df['mwl surge adjusted'] = filled_df['mwl surge']
-        
-    non_nan_mask = ~filled_df['mwl surge adjusted'].isna()
+    non_nan_mask = ~filled_df['mwl adjusted'].isna()
 
     non_nan_indices = filled_df[non_nan_mask].index
 
     for idx, val in zip(non_nan_indices[:len(adj_list)], adj_list):
-        filled_df.at[idx, 'mwl surge adjusted'] += val
-
-
-
+        filled_df.at[idx, 'mwl adjusted'] += val
+        
 
     return filled_df
+        
 
 def create_gaps(dataset):
 
@@ -336,11 +330,10 @@ def create_gaps(dataset):
     max_gap_size = 100
     random_index = random.sample(range(len(wl_data) - max_gap_size), 1000)
 
-    #print(len(random_index))
 
     #create one six min gap
 
-    wl_data.loc[random_index[0], 'pwl surge'] = np.nan
+    wl_data.loc[random_index[0], 'pwl'] = np.nan
     random_index = random_index[1:]
 
 
@@ -348,7 +341,7 @@ def create_gaps(dataset):
 
     for i in range(5):
 
-        wl_data.loc[random_index[i]:random_index[i] + 4, 'pwl surge'] = np.nan
+        wl_data.loc[random_index[i]:random_index[i] + 4, 'pwl'] = np.nan
     
     random_index = random_index[5:]
 
@@ -356,7 +349,7 @@ def create_gaps(dataset):
 
     for i in range(10):
 
-        wl_data.loc[random_index[i]:random_index[i] + 9, 'pwl surge'] = np.nan
+        wl_data.loc[random_index[i]:random_index[i] + 9, 'pwl'] = np.nan
     
     random_index = random_index[10:]
 
@@ -364,7 +357,7 @@ def create_gaps(dataset):
 
     for i in range(50):
 
-        wl_data.loc[random_index[i]:random_index[i] + 49, 'pwl surge'] = np.nan
+        wl_data.loc[random_index[i]:random_index[i] + 49, 'pwl'] = np.nan
     
     random_index = random_index[50:]
 
@@ -372,7 +365,7 @@ def create_gaps(dataset):
 
     for i in range(100):
 
-        wl_data.loc[random_index[i]:random_index[i] + 99, 'pwl surge'] = np.nan
+        wl_data.loc[random_index[i]:random_index[i] + 99, 'pwl'] = np.nan
     
     random_index = random_index[100:]
 
@@ -386,48 +379,90 @@ def cbi_gapfill(filepath):
     print('Reading dataset')
     wl_dataset = read_wl_csv(filepath)
 
-    #wl_dataset_gaps = create_gaps(wl_dataset)
+    gaps_true = input('Do you want to create artifical gaps y/n? ')
 
-    #print('Gaps Created')
+    if str(gaps_true) == str('y'):
+        
+        wl_dataset_gaps = create_gaps(wl_dataset)
 
-    Wl_gaps = locate_gaps(wl_dataset)
+        print('Gaps Created')
 
-    print('Total number of gaps: ', len(Wl_gaps))
+        Wl_gaps = locate_gaps(wl_dataset_gaps)
 
-    linear_gaps,multi_gaps = eligible_gap_length(Wl_gaps)
+        print('Total number of gaps: ', len(Wl_gaps))
 
-    print('Number of Linear Gaps filled:', len(linear_gaps))
+        linear_gaps,multi_gaps = eligible_gap_length(Wl_gaps)
 
-    dataset_LF = linear_fill(wl_dataset,linear_gaps)
+        print('Number of Linear Gaps filled:', len(linear_gaps))
 
-    print('Single gaps filled')
+        dataset_LF = linear_fill(wl_dataset_gaps,linear_gaps)
 
-    valid_multi_gaps = check_bwl(dataset_LF,multi_gaps)
+        print('Single gaps filled')
 
-    #print(valid_multi_gaps)
+        valid_multi_gaps = check_bwl(dataset_LF,multi_gaps)
 
-    print('Number of gaps with backup water level:', len(valid_multi_gaps))
+        print('Number of gaps with backup water level:', len(valid_multi_gaps))
 
-    poly_wl_list, index_location, gap_length, gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
+        poly_wl_list, index_location, gap_length, gap_list, adjustment_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
 
-    if len(poly_wl_list) > 0 :
 
-        filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF)
+        if len(poly_wl_list) > 0 :
 
-        adjusted_gaps = adjustment(filled_df,index_location,gap_length)
+            filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF)
 
-        print('Gaps filled', + len(poly_wl_list))
+            adj_values = adjustment(filled_df, adjustment_list)
 
-        return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, adjusted_gaps
-    
+            print('Gaps filled', + len(poly_wl_list))
+
+            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, adj_values
+        
+        else:
+            adj_values = []
+
+            return dataset_LF, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, adj_values
+
+    elif str(gaps_true) == str('n'):
+
+        Wl_gaps = locate_gaps(wl_dataset)
+
+        print('Total number of gaps: ', len(Wl_gaps))
+
+        linear_gaps,multi_gaps = eligible_gap_length(Wl_gaps)
+
+        print('Number of Linear Gaps filled:', len(linear_gaps))
+
+        dataset_LF = linear_fill(wl_dataset,linear_gaps)
+
+        print('Single gaps filled')
+
+        valid_multi_gaps = check_bwl(dataset_LF,multi_gaps)
+
+        print('Number of gaps with backup water level:', len(valid_multi_gaps))
+
+        poly_wl_list, index_location, gap_length, gap_list, adjustment_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
+
+
+        if len(poly_wl_list) > 0 :
+
+            filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF)
+
+            adj_values = adjustment(filled_df, adjustment_list)
+
+            print('Gaps filled', + len(poly_wl_list))
+
+            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, adj_values
+        
+        else:
+            adj_values = []
+
+            return dataset_LF, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, adj_values
     else:
-        adjusted_gaps = []
-
-        return dataset_LF, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, adjusted_gaps
-
-    #complete_dataset = adjustment(filled_wl_dataset,index_location,gap_length)
-
-    
-
-filled_df, wl_dataset, all_gaps, dataset_LF, poly_wl, filled_gap_list, adjusted_gaps = cbi_gapfill(r'/Users/rprocious/Waterlevels_CBI/CBI-2/Gap_Filling/P21_2016_gaps.csv')
-
+        print('Not an acceptable answer')
+        dataset_LF = []
+        Wl_gaps = []
+        dataset_LF = []
+        poly_wl_list = []
+        gap_list = []
+        adj_values = []
+        
+        return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, adj_values

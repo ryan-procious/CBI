@@ -1,10 +1,10 @@
-from GapFill_2014_CBI import *
+from GapFill_2014_CBI_Surge import *
 
 filepath = input('Insert Filepath to Water Level Dataset: ')
 
 try:
     # Call the gap-filling function
-    filled_data,orig_data = cbi_gapfill(filepath)
+    filled_data,orig_data,*_ = cbi_gapfill(filepath)
     print("Gap filling completed. Here's a preview of the data:")
     print(filled_data.head())
     print(orig_data.head())
