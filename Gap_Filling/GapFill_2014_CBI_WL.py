@@ -315,7 +315,7 @@ def create_gaps(dataset):
 
     #create 10 1hr gaps
 
-    for i in range(10):
+    for i in range(5):
 
         wl_data.loc[random_index[i]:random_index[i] + 9, 'pwl'] = np.nan
     
@@ -421,8 +421,9 @@ def cbi_gapfill(filepath):
             return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
         
         else:
+            #adj_values = []
 
-            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+            return dataset_LF, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list
     else:
         print('Not an acceptable answer')
         dataset_LF = []
