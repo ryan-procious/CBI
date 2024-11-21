@@ -218,45 +218,19 @@ def poly_gap_fill(Wl_data, gaps):
 
         return [],[],[],[],[]
 
-def fill_gaps(poly_list, gap_dates_list, wl_df):
+def fill_gaps(poly_list, gap_dates_list, wl_df, poly_gap_list):
 
-    matched_dates1 = []
-    matched_dates2 = []
+    wl_df['mwl'] = np.nan
 
-    # Process each gap and its corresponding poly_df
-    for gap_df, poly_df in zip(gap_dates_list, poly_list):
-        # Ensure dates are in datetime format
-        gap_df['date'] = pd.to_datetime(gap_df['date'])
-        poly_df['date'] = pd.to_datetime(poly_df['date'])
+    for i, (idx, length) in enumerate(poly_gap_list):
 
-        # Find common dates between gap_df and poly_df
-        common_dates = gap_df['date'][gap_df['date'].isin(poly_df['date'])]
+        poly_df = poly_list[i]
 
-        # Filter both DataFrames for the common dates
-        filtered_gap_df = gap_df[gap_df['date'].isin(common_dates)]
-        filtered_poly_df = poly_df[poly_df['date'].isin(common_dates)]
+        gap_values = poly_df.loc[2160:2160+length, 'mwl'].values
 
-        # Append the filtered DataFrames
-        matched_dates1.append(filtered_gap_df)
-        matched_dates2.append(filtered_poly_df)
+        wl_df.loc[idx:idx+length, 'mwl'] = gap_values
 
-    # Combine all matched DataFrames
-    match_df_1 = pd.concat(matched_dates1, ignore_index=True)
-    match_df_2 = pd.concat(matched_dates2, ignore_index=True)
-
-    # Merge the poly_df data with the original wl_df
-    Wl_data_total = match_df_2.merge(wl_df, on='date', how='outer')
-
-    # Clean up columns
-    Wl_data_total = Wl_data_total.drop(columns=['bwl_x', 'pwl_x', '#date+time'], errors='ignore')
-    Wl_data_total['pwl'] = Wl_data_total.get('pwl_y', None)
-    Wl_data_total['bwl'] = Wl_data_total.get('bwl_y', None)
-    Wl_data_total = Wl_data_total.drop(columns=['pwl_y', 'bwl_y'], errors='ignore')
-
-    # Clean up memory by deleting unnecessary variables
-    del poly_list, gap_dates_list, matched_dates1, matched_dates2, match_df_1, match_df_2
-
-    return Wl_data_total  
+    return wl_df
 
 def adjustment(filled_df, poly_gaps):
 
@@ -376,7 +350,7 @@ def cbi_gapfill(filepath):
 
         if len(poly_wl_list) > 0 :
 
-            filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF)
+            filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF,poly_gap_list)
 
             filled_df = adjustment(filled_df, poly_gap_list)
 
@@ -412,7 +386,7 @@ def cbi_gapfill(filepath):
 
         if len(poly_wl_list) > 0 :
 
-            filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF)
+            filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF,poly_gap_list)
 
             filled_df = adjustment(filled_df, poly_gap_list)
 
@@ -421,9 +395,8 @@ def cbi_gapfill(filepath):
             return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
         
         else:
-            #adj_values = []
 
-            return dataset_LF, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list
+            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
     else:
         print('Not an acceptable answer')
         dataset_LF = []
@@ -434,5 +407,3 @@ def cbi_gapfill(filepath):
         poly_gap_list = []
         
         return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
-
-
