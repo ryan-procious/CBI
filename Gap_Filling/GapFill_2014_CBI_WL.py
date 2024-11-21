@@ -117,6 +117,8 @@ def check_bwl(Wl_data,gaps):
 
         del matching_dates, index_locations, gap_length, valid_gaps, is_valid
 
+        print(len(filtered_gaps))
+
         return filtered_gaps
     
     else:
@@ -129,17 +131,17 @@ def poly_gap_fill(Wl_data, gaps):
 
     if len(gaps) > 0:
 
-        poly_df_list = list()
-        
+        poly_df_list = []
+
+        gap_date_list = []
+
+        poly_filled_gaps = []
+
         matching_dates = Wl_data[Wl_data['date'].isin(gaps['date'])]
 
         index_locations = matching_dates.index.tolist()
 
         gap_length = gaps['gapLength'].tolist()
-
-        gap_date_list = list()
-
-        adjustment_list = []
 
         for i in range(len(matching_dates)):
 
@@ -149,7 +151,6 @@ def poly_gap_fill(Wl_data, gaps):
 
             gap_date_list.append(gap_date_df)
             
-
 
         for i in range(len(index_locations)):
 
@@ -176,31 +177,12 @@ def poly_gap_fill(Wl_data, gaps):
 
                 poly_df['mwl linear'] = intercept + slope*poly_df['bwl']
 
-
-
-                #outliers = poly_df[abs(poly_df['mwl linear'] - poly_df['pwl']) > 0.1]
-
-                #print(f"Number of outliers detected: {len(outliers)}")
-
                 mask = abs(poly_df['mwl linear'] - poly_df['pwl']) > 0.1
                 
                 poly_df.loc[mask, 'pwl'] = np.nan
                 poly_df.loc[mask, 'mwl linear'] = np.nan
                 poly_df.loc[mask, 'bwl'] = np.nan
-                
-                '''plt.scatter(poly_df['pwl surge'], poly_df['bwl surge'])
 
-                plt.scatter(poly_df['mwl surge linear'],poly_df['bwl surge'] , color = 'red', linestyle = 'dashed', label = 'linear model')
-
-                plt.title('pwl surge vs bwl surge')
-
-                plt.show()
-
-                plt.clf()'''
-                
-            
-
-                
                 if poly_df['bwl'].isna().sum() + poly_df['pwl'].isna().sum() < len(Wl_data)*0.1:
 
                     poly_df_copy = poly_df.copy()
@@ -216,55 +198,28 @@ def poly_gap_fill(Wl_data, gaps):
                     pred_values = poly1(poly_df['bwl'])
 
                     poly_df['mwl'] = pred_values
-                    
-                    average_before_gap = np.nanmean(Wl_data['pwl'][(index_locations[i]-6):index_locations[i]].tolist())
-                    average_after_gap = np.nanmean(Wl_data['pwl'][(index_locations[i]+1+gap_length[i]):index_locations[i]+6+gap_length[i]].tolist())
-
-                    n_length = gap_length[i]
-
-                    for k in range(n_length):
-
-                        adjustment_value = (average_after_gap + (k / n_length)) * (average_before_gap - average_after_gap)
-
-                        adjustment_list.append(adjustment_value)
-
-                    '''plt.scatter([poly_df['pwl surge']], poly_df['bwl surge'])
-
-                    plt.scatter(poly_df['mwl surge'],poly_df['bwl surge'], color = 'black', linestyle = 'dashed')
-
-                    plt.title('pwl surge vs bwl surge (poly)')
-
-                    plt.show()
-
-                    plt.clf()'''
 
                     poly_df_list.append(poly_df)
 
-                    del poly_df_copy, poly, pred_values
+                    poly_filled_gaps.append((index_locations[i], gap_length[i]))
 
+                    del poly_df_copy, poly, pred_values
 
                 else:
                    print('Can not fill gap not enough points')
 
-
             else:
                 print('Can not fill gap out of bounds')
-        
 
-        return poly_df_list, index_locations, gap_length, gap_date_list, adjustment_list
-
+        return poly_df_list, index_locations, gap_length, gap_date_list, poly_filled_gaps
 
     else:
         print('No gaps to Fill')
-        index_locations  = []
-        gap_length = []
-        gap_date_list=[]
 
-        poly_df_list = []
-
-        return poly_df_list, index_locations, gap_length, gap_date_list
+        return [],[],[],[],[]
 
 def fill_gaps(poly_list, gap_dates_list, wl_df):
+
     matched_dates1 = []
     matched_dates2 = []
 
@@ -303,20 +258,33 @@ def fill_gaps(poly_list, gap_dates_list, wl_df):
 
     return Wl_data_total  
 
+def adjustment(filled_df, poly_gaps):
 
-def adjustment(filled_df, adj_list):
 
-    filled_df['mwl adjusted'] = filled_df['mwl']
-        
-    non_nan_mask = ~filled_df['mwl adjusted'].isna()
+    filled_df['mwl adjusted'] = np.nan
+    idx, length = map(list, zip(*poly_gaps))
 
-    non_nan_indices = filled_df[non_nan_mask].index
+    for i in range(len(idx)):
+        adjustment_values = []
 
-    for idx, val in zip(non_nan_indices[:len(adj_list)], adj_list):
-        filled_df.at[idx, 'mwl adjusted'] += val
-        
+        # Calculate averages before and after the gap
+        average_before = np.nanmean(filled_df['pwl'][idx[i] - 6:idx[i]])
+        average_after = np.nanmean(filled_df['pwl'][idx[i] + length[i]:idx[i] + length[i] + 6])
 
+        n_length = length[i]
+
+        for k in range(n_length):
+            value = (average_after + (k / n_length)) * (average_before - average_after)
+            adjustment_values.append(value)
+
+        filled_df.loc[idx[i]:idx[i] + length[i] - 1, 'mwl adjusted'] = (
+            filled_df.loc[idx[i]:idx[i] + length[i] - 1, 'mwl'] + adjustment_values
+        )
+
+    filled_df['new wl adjustment'] = filled_df['pwl'].combine_first(filled_df['mwl adjusted'])
+    filled_df['new wl'] = filled_df['pwl'].combine_first(filled_df['mwl'])
     return filled_df
+
         
 
 def create_gaps(dataset):
@@ -403,23 +371,23 @@ def cbi_gapfill(filepath):
 
         print('Number of gaps with backup water level:', len(valid_multi_gaps))
 
-        poly_wl_list, index_location, gap_length, gap_list, adjustment_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
+        poly_wl_list, index_location, gap_length, gap_list, poly_gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
 
 
         if len(poly_wl_list) > 0 :
 
             filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF)
 
-            adj_values = adjustment(filled_df, adjustment_list)
+            filled_df = adjustment(filled_df, poly_gap_list)
 
             print('Gaps filled', + len(poly_wl_list))
 
-            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, adj_values
+            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
         
         else:
-            adj_values = []
+            #adj_values = []
 
-            return dataset_LF, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, adj_values
+            return dataset_LF, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list
 
     elif str(gaps_true) == str('n'):
 
@@ -439,23 +407,22 @@ def cbi_gapfill(filepath):
 
         print('Number of gaps with backup water level:', len(valid_multi_gaps))
 
-        poly_wl_list, index_location, gap_length, gap_list, adjustment_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
+        poly_wl_list, index_location, gap_length, gap_list, poly_gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
 
 
         if len(poly_wl_list) > 0 :
 
             filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF)
 
-            adj_values = adjustment(filled_df, adjustment_list)
+            filled_df = adjustment(filled_df, poly_gap_list)
 
             print('Gaps filled', + len(poly_wl_list))
 
-            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, adj_values
+            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
         
         else:
-            adj_values = []
 
-            return dataset_LF, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, adj_values
+            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
     else:
         print('Not an acceptable answer')
         dataset_LF = []
@@ -463,6 +430,8 @@ def cbi_gapfill(filepath):
         dataset_LF = []
         poly_wl_list = []
         gap_list = []
-        adj_values = []
+        poly_gap_list = []
         
-        return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, adj_values
+        return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+
+
