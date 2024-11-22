@@ -308,10 +308,7 @@ def create_gaps(dataset):
 
         wl_data.loc[random_index[i]:random_index[i] + 99, 'pwl'] = np.nan
     
-    random_index = random_index[100:]
-
-
-    #print((wl_data.isna().sum()))'''
+    random_index = random_index[10:]
 
     return wl_data
 
