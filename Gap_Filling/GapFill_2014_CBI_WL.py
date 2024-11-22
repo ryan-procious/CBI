@@ -42,8 +42,7 @@ def locate_gaps(WL_data):
         if pd.isna(WL_data['pwl'][i]):
             if count == 0:  # Start of a new NaN gap
                 dates.append(WL_data['date'][i])  # Record the start date of the gap
-            count += 1  # Increment the gap length
-
+            count += 1 
         else:
             if count > 0:  # End of a NaN gap
                 lengthMissVal.append(count)
