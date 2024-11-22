@@ -265,7 +265,7 @@ def create_gaps(dataset):
 
     import random
 
-    wl_data =  dataset.copy() #pd.DataFrame(dataset)
+    wl_data =  dataset.copy()
 
     random_index = [random.randint(0,len(wl_data))for _ in range(1000)]
 
@@ -278,18 +278,17 @@ def create_gaps(dataset):
     wl_data.loc[random_index[0], 'pwl'] = np.nan
     random_index = random_index[1:]
 
-
     # create 5 30 min gaps
 
     for i in range(5):
 
         wl_data.loc[random_index[i]:random_index[i] + 4, 'pwl'] = np.nan
     
-    random_index = random_index[5:]
+    random_index = random_index[25:]
 
     #create 10 1hr gaps
 
-    for i in range(5):
+    for i in range(10):
 
         wl_data.loc[random_index[i]:random_index[i] + 9, 'pwl'] = np.nan
     
@@ -312,7 +311,7 @@ def create_gaps(dataset):
     random_index = random_index[100:]
 
 
-    #print((wl_data.isna().sum()))
+    #print((wl_data.isna().sum()))'''
 
     return wl_data
 
@@ -345,23 +344,26 @@ def cbi_gapfill(filepath):
 
         print('Number of gaps with backup water level:', len(valid_multi_gaps))
 
-        poly_wl_list, index_location, gap_length, gap_list, poly_gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
+        if len(valid_multi_gaps) > 0:
+
+            poly_wl_list, index_location, gap_length, gap_list, poly_gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
 
 
-        if len(poly_wl_list) > 0 :
+            if len(poly_wl_list) > 0 :
 
-            filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF,poly_gap_list)
+                filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF,poly_gap_list)
 
-            filled_df = adjustment(filled_df, poly_gap_list)
+                filled_df = adjustment(filled_df, poly_gap_list)
 
-            print('Gaps filled', + len(poly_wl_list))
+                print('Gaps filled', + len(poly_wl_list))
 
-            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
-        
+                return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+            
+            else:
+
+                return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
         else:
-            #adj_values = []
-
-            return dataset_LF, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list
+            return wl_dataset,wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
 
     elif str(gaps_true) == str('n'):
 
@@ -380,23 +382,28 @@ def cbi_gapfill(filepath):
         valid_multi_gaps = check_bwl(dataset_LF,multi_gaps)
 
         print('Number of gaps with backup water level:', len(valid_multi_gaps))
-
         poly_wl_list, index_location, gap_length, gap_list, poly_gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
 
+        if len(valid_multi_gaps) > 0:
 
-        if len(poly_wl_list) > 0 :
+            poly_wl_list, index_location, gap_length, gap_list, poly_gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
 
-            filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF,poly_gap_list)
 
-            filled_df = adjustment(filled_df, poly_gap_list)
+            if len(poly_wl_list) > 0 :
 
-            print('Gaps filled', + len(poly_wl_list))
+                filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF,poly_gap_list)
 
-            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
-        
+                filled_df = adjustment(filled_df, poly_gap_list)
+
+                print('Gaps filled', + len(poly_wl_list))
+
+                return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+            
+            else:
+
+                return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
         else:
-
-            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+            return wl_dataset,wl_dataset,Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
     else:
         print('Not an acceptable answer')
         dataset_LF = []
