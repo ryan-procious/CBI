@@ -7,7 +7,6 @@ import matplotlib.dates as mdates
 from scipy import stats
 warnings.filterwarnings("ignore")
 
-
 def read_wl_csv(file_path):
     wl_df = pd.read_csv(file_path)
 
@@ -115,8 +114,6 @@ def check_bwl(Wl_data,gaps):
         filtered_gaps = gaps[valid_gaps].reset_index(drop=True)
 
         del matching_dates, index_locations, gap_length, valid_gaps, is_valid
-
-        print(len(filtered_gaps))
 
         return filtered_gaps
     
@@ -268,7 +265,7 @@ def create_gaps(dataset):
 
     random_index = [random.randint(0,len(wl_data))for _ in range(1000)]
 
-    max_gap_size = 100
+    max_gap_size = 99
     random_index = random.sample(range(len(wl_data) - max_gap_size), 1000)
 
 
@@ -277,37 +274,37 @@ def create_gaps(dataset):
     wl_data.loc[random_index[0], 'pwl'] = np.nan
     random_index = random_index[1:]
 
-    # create 5 30 min gaps
+    '''# create 5 30 min gaps
 
-    for i in range(5):
+    for i in range(999):
 
         wl_data.loc[random_index[i]:random_index[i] + 4, 'pwl'] = np.nan
     
-    random_index = random_index[25:]
+    #random_index = random_index[100:]
 
     #create 10 1hr gaps
 
-    for i in range(10):
+    for i in range(999):
 
         wl_data.loc[random_index[i]:random_index[i] + 9, 'pwl'] = np.nan
     
-    random_index = random_index[10:]
+    #random_index = random_index[10:]
 
     #creates 50 5 hr gaps
 
-    for i in range(50):
+    for i in range(999):
 
         wl_data.loc[random_index[i]:random_index[i] + 49, 'pwl'] = np.nan
     
-    random_index = random_index[50:]
+    random_index = random_index[50:]'''
 
     #creates 100 10hr gaps
 
-    for i in range(100):
+    for i in range(999):
 
         wl_data.loc[random_index[i]:random_index[i] + 99, 'pwl'] = np.nan
     
-    random_index = random_index[10:]
+    #random_index = random_index[10:]
 
     return wl_data
 
@@ -316,7 +313,49 @@ def cbi_gapfill(filepath):
     print('Reading dataset')
     wl_dataset = read_wl_csv(filepath)
 
-    gaps_true = input('Do you want to create artifical gaps y/n? ')
+    wl_dataset_gaps = create_gaps(wl_dataset)
+
+    print('Gaps Created')
+
+    Wl_gaps = locate_gaps(wl_dataset_gaps)
+
+    print('Total number of gaps: ', len(Wl_gaps))
+
+    linear_gaps,multi_gaps = eligible_gap_length(Wl_gaps)
+
+    print('Number of Linear Gaps filled:', len(linear_gaps))
+
+    dataset_LF = linear_fill(wl_dataset_gaps,linear_gaps)
+
+    print('Single gaps filled')
+
+    valid_multi_gaps = check_bwl(dataset_LF,multi_gaps)
+
+    print('Number of gaps with backup water level:', len(valid_multi_gaps))
+
+    if len(valid_multi_gaps) > 0:
+
+        poly_wl_list, index_location, gap_length, gap_list, poly_gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
+
+
+        if len(poly_wl_list) > 0 :
+
+            filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF,poly_gap_list)
+
+            filled_df = adjustment(filled_df, poly_gap_list)
+
+            print('Gaps filled', + len(poly_wl_list))
+
+            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+        
+        else:
+
+            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+    else:
+        return wl_dataset,wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+
+
+    '''gaps_true = input('Do you want to create artifical gaps y/n? ')
 
     if str(gaps_true) == str('y'):
         
@@ -409,4 +448,4 @@ def cbi_gapfill(filepath):
         gap_list = []
         poly_gap_list = []
         
-        return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+        return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list'''
