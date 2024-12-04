@@ -244,7 +244,7 @@ def adjustment(filled_df, poly_gaps):
         n_length = length[i]
 
         for k in range(n_length):
-            value = (average_after + (k / n_length)) * (average_before - average_after)
+            value = (average_after + (k+1 / n_length)) * (average_before - average_after)
             adjustment_values.append(value)
 
         filled_df.loc[idx[i]:idx[i] + length[i] - 1, 'mwl adjusted'] = (
@@ -265,7 +265,7 @@ def create_gaps(dataset):
 
     random_index = [random.randint(0,len(wl_data))for _ in range(1000)]
 
-    max_gap_size = 99
+    max_gap_size = 100
     random_index = random.sample(range(len(wl_data) - max_gap_size), 1000)
 
 
@@ -274,9 +274,9 @@ def create_gaps(dataset):
     wl_data.loc[random_index[0], 'pwl'] = np.nan
     random_index = random_index[1:]
 
-    '''# create 5 30 min gaps
+    # create 5 30 min gaps
 
-    for i in range(999):
+    for i in range(4):
 
         wl_data.loc[random_index[i]:random_index[i] + 4, 'pwl'] = np.nan
     
@@ -284,7 +284,7 @@ def create_gaps(dataset):
 
     #create 10 1hr gaps
 
-    for i in range(999):
+    for i in range(10):
 
         wl_data.loc[random_index[i]:random_index[i] + 9, 'pwl'] = np.nan
     
@@ -292,15 +292,15 @@ def create_gaps(dataset):
 
     #creates 50 5 hr gaps
 
-    for i in range(999):
+    for i in range(50):
 
         wl_data.loc[random_index[i]:random_index[i] + 49, 'pwl'] = np.nan
     
-    random_index = random_index[50:]'''
+    random_index = random_index[50:]
 
     #creates 100 10hr gaps
 
-    for i in range(999):
+    for i in range(100):
 
         wl_data.loc[random_index[i]:random_index[i] + 99, 'pwl'] = np.nan
     
