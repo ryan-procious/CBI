@@ -7,7 +7,6 @@ import matplotlib.dates as mdates
 from scipy import stats
 warnings.filterwarnings("ignore")
 
-
 def read_wl_csv(file_path):
     wl_df = pd.read_csv(file_path)
 
@@ -42,8 +41,7 @@ def locate_gaps(WL_data):
         if pd.isna(WL_data['pwl surge'][i]):
             if count == 0:  # Start of a new NaN gap
                 dates.append(WL_data['date'][i])  # Record the start date of the gap
-            count += 1  # Increment the gap length
-
+            count += 1 
         else:
             if count > 0:  # End of a NaN gap
                 lengthMissVal.append(count)
@@ -83,8 +81,8 @@ def linear_fill(Wl_data,linear_gaps): #function to fill in gaps with length of 1
         index_locations = matching_dates.index.tolist()
 
         for i in range(len(index_locations)):
-            new_value = ((Wl_data.loc[(index_locations[i])-1,'pwl surge']+ Wl_data.loc[index_locations[i]+1,'pwl surge']) / 2)
-            Wl_data.loc[index_locations[i],'pwl surge'] = new_value
+            new_value = ((Wl_data.loc[(index_locations[i])-1,'pwl surge']+ Wl_data.loc[index_locations[i]+1,'pwl surge']) / 2) + Wl_data.loc[index_locations[i],'harmwl']
+            Wl_data.loc[index_locations[i],'pwl'] = new_value
 
         del matching_dates, index_locations, new_value
         
@@ -116,8 +114,6 @@ def check_bwl(Wl_data,gaps):
         filtered_gaps = gaps[valid_gaps].reset_index(drop=True)
 
         del matching_dates, index_locations, gap_length, valid_gaps, is_valid
-
-        print(len(filtered_gaps))
 
         return filtered_gaps
     
@@ -183,7 +179,7 @@ def poly_gap_fill(Wl_data, gaps):
                 poly_df.loc[mask, 'mwl surge linear'] = np.nan
                 poly_df.loc[mask, 'bwl surge'] = np.nan
 
-                if poly_df['bwl surge'].isna().sum() + poly_df['pwl surge'].isna().sum() < len(Wl_data)*0.1:
+                if poly_df['bwl'].isna().sum() + poly_df['pwl surge'].isna().sum() < len(Wl_data)*0.1:
 
                     poly_df_copy = poly_df.copy()
 
@@ -231,6 +227,7 @@ def fill_gaps(poly_list, gap_dates_list, wl_df, poly_gap_list):
         wl_df.loc[idx:idx+length, 'mwl surge'] = gap_values
 
     return wl_df
+
 def adjustment(filled_df, poly_gaps):
 
 
@@ -247,7 +244,7 @@ def adjustment(filled_df, poly_gaps):
         n_length = length[i]
 
         for k in range(n_length):
-            value = (average_after + (k / n_length)) * (average_before - average_after)
+            value = (average_after + (k+1 / n_length)) * (average_before - average_after)
             adjustment_values.append(value)
 
         filled_df.loc[idx[i]:idx[i] + length[i] - 1, 'mwl surge adjusted'] = (
@@ -264,7 +261,7 @@ def create_gaps(dataset):
 
     import random
 
-    wl_data =  dataset.copy() #pd.DataFrame(dataset)
+    wl_data =  dataset.copy()
 
     random_index = [random.randint(0,len(wl_data))for _ in range(1000)]
 
@@ -277,14 +274,13 @@ def create_gaps(dataset):
     wl_data.loc[random_index[0], 'pwl surge'] = np.nan
     random_index = random_index[1:]
 
-
     # create 5 30 min gaps
 
-    for i in range(5):
+    for i in range(4):
 
         wl_data.loc[random_index[i]:random_index[i] + 4, 'pwl surge'] = np.nan
     
-    random_index = random_index[5:]
+    #random_index = random_index[100:]
 
     #create 10 1hr gaps
 
@@ -292,7 +288,7 @@ def create_gaps(dataset):
 
         wl_data.loc[random_index[i]:random_index[i] + 9, 'pwl surge'] = np.nan
     
-    random_index = random_index[10:]
+    #random_index = random_index[10:]
 
     #creates 50 5 hr gaps
 
@@ -308,10 +304,7 @@ def create_gaps(dataset):
 
         wl_data.loc[random_index[i]:random_index[i] + 99, 'pwl surge'] = np.nan
     
-    random_index = random_index[100:]
-
-
-    #print((wl_data.isna().sum()))
+    #random_index = random_index[10:]
 
     return wl_data
 
@@ -320,7 +313,49 @@ def cbi_gapfill(filepath):
     print('Reading dataset')
     wl_dataset = read_wl_csv(filepath)
 
-    gaps_true = input('Do you want to create artifical gaps y/n? ')
+    wl_dataset_gaps = create_gaps(wl_dataset)
+
+    print('Gaps Created')
+
+    Wl_gaps = locate_gaps(wl_dataset_gaps)
+
+    print('Total number of gaps: ', len(Wl_gaps))
+
+    linear_gaps,multi_gaps = eligible_gap_length(Wl_gaps)
+
+    print('Number of Linear Gaps filled:', len(linear_gaps))
+
+    dataset_LF = linear_fill(wl_dataset_gaps,linear_gaps)
+
+    print('Single gaps filled')
+
+    valid_multi_gaps = check_bwl(dataset_LF,multi_gaps)
+
+    print('Number of gaps with backup water level:', len(valid_multi_gaps))
+
+    if len(valid_multi_gaps) > 0:
+
+        poly_wl_list, index_location, gap_length, gap_list, poly_gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
+
+
+        if len(poly_wl_list) > 0 :
+
+            filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF,poly_gap_list)
+
+            filled_df = adjustment(filled_df, poly_gap_list)
+
+            print('Gaps filled', + len(poly_wl_list))
+
+            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+        
+        else:
+
+            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+    else:
+        return wl_dataset,wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+
+
+    '''gaps_true = input('Do you want to create artifical gaps y/n? ')
 
     if str(gaps_true) == str('y'):
         
@@ -344,23 +379,26 @@ def cbi_gapfill(filepath):
 
         print('Number of gaps with backup water level:', len(valid_multi_gaps))
 
-        poly_wl_list, index_location, gap_length, gap_list, poly_gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
+        if len(valid_multi_gaps) > 0:
+
+            poly_wl_list, index_location, gap_length, gap_list, poly_gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
 
 
-        if len(poly_wl_list) > 0 :
+            if len(poly_wl_list) > 0 :
 
-            filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF)
+                filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF,poly_gap_list)
 
-            filled_df = adjustment(filled_df, poly_gap_list)
+                filled_df = adjustment(filled_df, poly_gap_list)
 
-            print('Gaps filled', + len(poly_wl_list))
+                print('Gaps filled', + len(poly_wl_list))
 
-            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
-        
+                return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+            
+            else:
+
+                return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
         else:
-            #adj_values = []
-
-            return dataset_LF, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list
+            return wl_dataset,wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
 
     elif str(gaps_true) == str('n'):
 
@@ -379,23 +417,28 @@ def cbi_gapfill(filepath):
         valid_multi_gaps = check_bwl(dataset_LF,multi_gaps)
 
         print('Number of gaps with backup water level:', len(valid_multi_gaps))
-
         poly_wl_list, index_location, gap_length, gap_list, poly_gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
 
+        if len(valid_multi_gaps) > 0:
 
-        if len(poly_wl_list) > 0 :
+            poly_wl_list, index_location, gap_length, gap_list, poly_gap_list = poly_gap_fill(dataset_LF,valid_multi_gaps)
 
-            filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF)
 
-            filled_df = adjustment(filled_df, poly_gap_list)
+            if len(poly_wl_list) > 0 :
 
-            print('Gaps filled', + len(poly_wl_list))
+                filled_df = fill_gaps(poly_wl_list,gap_list,dataset_LF,poly_gap_list)
 
-            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
-        
+                filled_df = adjustment(filled_df, poly_gap_list)
+
+                print('Gaps filled', + len(poly_wl_list))
+
+                return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+            
+            else:
+
+                return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
         else:
-
-            return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
+            return wl_dataset,wl_dataset,Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
     else:
         print('Not an acceptable answer')
         dataset_LF = []
@@ -405,6 +448,4 @@ def cbi_gapfill(filepath):
         gap_list = []
         poly_gap_list = []
         
-        return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list
-
-
+        return filled_df, wl_dataset, Wl_gaps, dataset_LF, poly_wl_list, gap_list, poly_gap_list'''
